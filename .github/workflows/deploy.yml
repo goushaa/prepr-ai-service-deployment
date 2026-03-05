@@ -52,7 +52,7 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --max-instances 4 \
-            --concurrency 10 \
+            --concurrency 1 \
             --port 8080 \
             --quiet
 
