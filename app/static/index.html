@@ -559,6 +559,12 @@
             try {
                 const res = await fetch(path);
                 const data = await res.json();
+
+                // Track discovered instances outside of load tests
+                if (data.instance && typeof heartBeat === 'function') {
+                    heartBeat(data.instance);
+                }
+
                 const elapsed = ((performance.now() - start) / 1000).toFixed(2);
                 const formatted = Object.entries(data)
                     .map(([k, v]) => {
