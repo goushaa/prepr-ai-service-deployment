@@ -90,7 +90,6 @@ async def burst(duration: int = 30, rps: int = 20, request: Request = None):
     target = f"{scheme}://{host}/generate"
 
     import httpx
-    all_results = []
     limits = httpx.Limits(max_connections=rps * 5, max_keepalive_connections=rps * 5)
 
     async def fire_one(client):
