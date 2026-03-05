@@ -61,9 +61,14 @@ async def generate():
     }
 
 @app.get("/burst")
-async def burst(duration: int = 10, rps: int = 10):
+async def burst(request: Request, duration: int = 10, rps: int = 10):
     """Fires sustained load to demonstrate auto-scaling via SSE."""
     import httpx
+    
+    # Reconstruct the public URL so requests go through the Cloud Run Load Balancer
+    host = request.headers.get("host", "localhost:8080")
+    scheme = "https" if "run.app" in host else request.url.scheme
+    target_url = f"{scheme}://{host}/generate"
     
     async def event_stream():
         start_time = time.time()
@@ -75,7 +80,7 @@ async def burst(duration: int = 10, rps: int = 10):
         async with httpx.AsyncClient(timeout=10.0) as client:
             while time.time() - start_time < duration:
                 # Fire batch of requests for the current second
-                batch = [client.get("http://localhost:8080/generate", headers={"Connection": "close"}) for _ in range(rps)]
+                batch = [client.get(target_url, headers={"Connection": "close"}) for _ in range(rps)]
                 results = await asyncio.gather(*batch, return_exceptions=True)
                 
                 for r in results:
