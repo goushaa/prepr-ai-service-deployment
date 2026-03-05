@@ -57,8 +57,8 @@ async def health():
 
 @app.get("/generate")
 async def generate():
-    """Simulates an AI response with 0.5-1.5s latency (like calling an ML model)."""
-    latency = random.uniform(0.5, 1.5)
+    """Simulates an AI response with 2-4s latency (like calling an ML model)."""
+    latency = random.uniform(2.0, 4.0)
     await asyncio.sleep(latency)
 
     return JSONResponse(
