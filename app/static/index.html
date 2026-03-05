@@ -669,7 +669,8 @@
             const now = Date.now();
             const staleIds = [];
             for (const [id, lastSeen] of liveInstances.entries()) {
-                if (now - lastSeen > 30000) staleIds.push(id);
+                // Reduced staleness threshold from 30s to 10s for faster detection
+                if (now - lastSeen > 10000) staleIds.push(id);
             }
             if (staleIds.length > 0) {
                 liveInstances.delete(staleIds[0]);
@@ -684,7 +685,8 @@
                 if (data.instance) heartBeat(data.instance);
             } catch (e) { }
         }
-        setInterval(keepAlive, 15000);
+        // Ping every 5s to ensure the main container stays alive in the tracker
+        setInterval(keepAlive, 5000);
         keepAlive();
     </script>
 </body>
