@@ -82,3 +82,59 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+# --- Monitoring: Alert on high p95 latency ---
+
+resource "google_monitoring_alert_policy" "high_latency" {
+  display_name = "Cloud Run - High p95 Latency"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "p95 request latency > 2500ms"
+
+    condition_threshold {
+      filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"prepr-ai-service\" AND metric.type = \"run.googleapis.com/request_latencies\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 2500  # 2.5s — alert before hitting the 3s SLA
+      duration        = "60s" # Must exceed for 60s to avoid false alarms
+
+      aggregations {
+        alignment_period     = "60s"
+        per_series_aligner   = "ALIGN_PERCENTILE_95"
+        cross_series_reducer = "REDUCE_MAX"
+      }
+    }
+  }
+
+  alert_strategy {
+    auto_close = "1800s"  # Auto-close alert after 30 min if resolved
+  }
+}
+
+# --- Monitoring: Alert on high error rate ---
+
+resource "google_monitoring_alert_policy" "high_error_rate" {
+  display_name = "Cloud Run - High Error Rate"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "5xx error rate > 5%"
+
+    condition_threshold {
+      filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"prepr-ai-service\" AND metric.type = \"run.googleapis.com/request_count\" AND metric.labels.response_code_class = \"5xx\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 5
+      duration        = "60s"
+
+      aggregations {
+        alignment_period     = "60s"
+        per_series_aligner   = "ALIGN_RATE"
+        cross_series_reducer = "REDUCE_SUM"
+      }
+    }
+  }
+
+  alert_strategy {
+    auto_close = "1800s"
+  }
+}
