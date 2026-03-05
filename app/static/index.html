@@ -560,7 +560,7 @@
                 const res = await fetch(path);
                 const data = await res.json();
 
-                // Track discovered instances outside of load tests
+                // Track manually discovered instances
                 if (data.instance && typeof heartBeat === 'function') {
                     heartBeat(data.instance);
                 }
@@ -664,12 +664,12 @@
             updateBadgeUI();
         }
 
-        // Staggered Pruning: removes max 1 instance per 2s cycle to simulate organic scale-down
+        // Staggered instance pruning
         setInterval(() => {
             const now = Date.now();
             const staleIds = [];
             for (const [id, lastSeen] of liveInstances.entries()) {
-                // Reduced staleness threshold from 30s to 10s for faster detection
+                // 10s staleness threshold
                 if (now - lastSeen > 10000) staleIds.push(id);
             }
             if (staleIds.length > 0) {
@@ -685,7 +685,7 @@
                 if (data.instance) heartBeat(data.instance);
             } catch (e) { }
         }
-        // Ping every 5s to ensure the main container stays alive in the tracker
+        // Background keep-alive ping
         setInterval(keepAlive, 5000);
         keepAlive();
     </script>

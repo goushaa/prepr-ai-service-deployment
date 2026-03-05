@@ -15,35 +15,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Check out the code
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Authenticate to GCP using a service account key
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # 3. Set up gcloud CLI
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      # 4. Authenticate Docker to Artifact Registry
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-      # 5. Build the Docker image
       - name: Build image
         run: docker build -t ${{ env.IMAGE }}:${{ github.sha }} -t ${{ env.IMAGE }}:latest .
 
-      # 6. Push to Artifact Registry
       - name: Push image
         run: |
           docker push ${{ env.IMAGE }}:${{ github.sha }}
           docker push ${{ env.IMAGE }}:latest
 
-      # 7. Deploy to Cloud Run
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
@@ -57,7 +50,6 @@ jobs:
             --port 8080 \
             --quiet
 
-      # 8. Output the live URL
       - name: Get service URL
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format='value(status.url)')

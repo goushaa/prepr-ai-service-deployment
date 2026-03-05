@@ -14,7 +14,7 @@ provider "google" {
   region  = var.region
 }
 
-# --- Artifact Registry (stores our Docker images) ---
+# --- Artifact Registry ---
 
 resource "google_artifact_registry_repository" "repo" {
   location      = var.region
@@ -48,13 +48,13 @@ resource "google_cloud_run_v2_service" "api" {
 
       resources {
         limits = {
-          cpu    = "1"       # 1 vCPU — plenty for I/O-bound async workload
-          memory = "512Mi"   # FastAPI + uvicorn barely uses 100MB
+          cpu    = "1"
+          memory = "512Mi"
         }
-        cpu_idle = false     # CPU always allocated (steady 20 req/s = always active)
+        cpu_idle = false
       }
 
-      # Health check — Cloud Run uses this to verify the container is alive
+      # Health check probe
       startup_probe {
         http_get {
           path = "/health"
@@ -65,8 +65,8 @@ resource "google_cloud_run_v2_service" "api" {
       }
     }
 
-    # Max concurrent requests per instance
-    max_instance_request_concurrency = var.max_concurrency  # 80 — conservative for async Python
+    # Concurrency limit
+    max_instance_request_concurrency = var.max_concurrency
   }
 
   # Route all traffic to the latest revision
@@ -76,7 +76,7 @@ resource "google_cloud_run_v2_service" "api" {
   }
 }
 
-# --- IAM: Allow public access (unauthenticated) ---
+# --- IAM: Public Access ---
 
 resource "google_cloud_run_v2_service_iam_member" "public" {
   name     = google_cloud_run_v2_service.api.name
@@ -111,8 +111,8 @@ resource "google_monitoring_alert_policy" "high_latency" {
     condition_threshold {
       filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"prepr-ai-service\" AND metric.type = \"run.googleapis.com/request_latencies\""
       comparison      = "COMPARISON_GT"
-      threshold_value = 2500  # 2.5s — alert before hitting the 3s SLA
-      duration        = "60s" # Must exceed for 60s to avoid false alarms
+      threshold_value = 2500
+      duration        = "60s"
 
       aggregations {
         alignment_period     = "60s"
@@ -123,7 +123,7 @@ resource "google_monitoring_alert_policy" "high_latency" {
   }
 
   alert_strategy {
-    auto_close = "1800s"  # Auto-close alert after 30 min if resolved
+    auto_close = "1800s"
   }
 }
 

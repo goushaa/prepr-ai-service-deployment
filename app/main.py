@@ -39,7 +39,7 @@ async def add_process_time_header(request: Request, call_next):
     
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Instance-ID"] = INSTANCE_ID
-    # Connection: close ensures Cloud Run load balancer distributes requests effectively
+    # Force connection close for load balancer distribution
     response.headers["Connection"] = "close"
     return response
 
@@ -64,13 +64,13 @@ async def burst(request: Request, duration: int = 10, rps: int = 10):
     """Fires sustained load to demonstrate auto-scaling via SSE."""
     import httpx
     
-    # Reconstruct the public URL so requests go through the Cloud Run Load Balancer
+    # Reconstruct public host for external routing
     host = request.headers.get("x-forwarded-host", request.headers.get("host", "localhost:8080"))
     scheme = request.headers.get("x-forwarded-proto", "http" if "localhost" in host else "https")
     target_url = f"{scheme}://{host}/generate"
     
     async def event_stream():
-        # High concurrency limits to support burst traffic without queuing internally
+        # Configure high connection pool limits for burst capacity
         limits = httpx.Limits(max_connections=rps * 5, max_keepalive_connections=0)
         
         state = {
@@ -82,7 +82,7 @@ async def burst(request: Request, duration: int = 10, rps: int = 10):
 
         async def fire_one(client):
             try:
-                # Connection: close forces the GFE load balancer to route new connections to new instances
+                # Prevent connection keep-alive to ensure GFE routes to new instances
                 res = await client.get(target_url, headers={"Connection": "close"}, timeout=30.0)
                 data = res.json()
                 if "instance" in data:
@@ -107,7 +107,7 @@ async def burst(request: Request, duration: int = 10, rps: int = 10):
 
                 if firing:
                     wave += 1
-                    # Fire one wave of requests concurrently without blocking
+                    # Dispatch request wave concurrently
                     for _ in range(rps):
                         t = asyncio.create_task(fire_one(client))
                         tasks.add(t)

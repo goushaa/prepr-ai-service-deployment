@@ -17,19 +17,19 @@ variable "image" {
 # --- Scaling variables (tune per environment) ---
 
 variable "min_instances" {
-  description = "Minimum always-warm instances (2 for prod, 0 for demo)"
+  description = "Minimum always-warm instances"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "max_instances" {
-  description = "Maximum instances (cost safety cap)"
+  description = "Maximum active instances"
   type        = number
-  default     = 8
+  default     = 10
 }
 
 variable "max_concurrency" {
   description = "Max concurrent requests per instance"
   type        = number
-  default     = 80
+  default     = 15
 }
