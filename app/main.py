@@ -78,9 +78,11 @@ async def burst(count: int = 50, request: Request = None):
     """Fires N concurrent requests through the load balancer to trigger auto-scaling."""
     count = min(count, 200)  # Safety cap
 
-    # Build the URL for /generate using the incoming request's host
-    base_url = str(request.base_url).rstrip("/")
-    target = f"{base_url}/generate"
+    # On Cloud Run, TLS terminates at the load balancer so the app sees http://localhost.
+    # Use forwarded headers to reconstruct the public URL that goes through the LB.
+    host = request.headers.get("x-forwarded-host", request.headers.get("host", "localhost:8080"))
+    scheme = request.headers.get("x-forwarded-proto", "http")
+    target = f"{scheme}://{host}/generate"
 
     results = []
 
