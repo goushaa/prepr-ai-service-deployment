@@ -9,7 +9,6 @@ from typing import Dict
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from google.cloud import monitoring_v3
 
 # Setup structured logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -49,9 +48,9 @@ async def health():
     """Liveness probe used by Cloud Run."""
     return {"status": "healthy", "instance": INSTANCE_ID}
 
-@app.get("/generate")
+@app.get("/generate", include_in_schema=False)
 async def generate():
-    """Simulates an AI generation task with 2-4s latency."""
+    """Simulates an AI generation task with 2-4s latency. Hidden from Swagger docs."""
     delay = 2 + (time.time() % 2)
     await asyncio.sleep(delay)
     return {
@@ -66,82 +65,94 @@ async def burst(request: Request, duration: int = 10, rps: int = 10):
     import httpx
     
     # Reconstruct the public URL so requests go through the Cloud Run Load Balancer
-    host = request.headers.get("host", "localhost:8080")
-    scheme = "https" if "run.app" in host else request.url.scheme
+    host = request.headers.get("x-forwarded-host", request.headers.get("host", "localhost:8080"))
+    scheme = request.headers.get("x-forwarded-proto", "http" if "localhost" in host else "https")
     target_url = f"{scheme}://{host}/generate"
     
     async def event_stream():
-        start_time = time.time()
-        total_requests = duration * rps
-        completed = 0
-        instance_counts = {}
-        latencies = []
+        # High concurrency limits to support burst traffic without queuing internally
+        limits = httpx.Limits(max_connections=rps * 5, max_keepalive_connections=0)
+        
+        state = {
+            "completed": 0,
+            "instances": {},
+            "latencies": [],
+            "total_fired": 0
+        }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            while time.time() - start_time < duration:
-                # Fire batch of requests for the current second
-                batch = [client.get(target_url, headers={"Connection": "close"}) for _ in range(rps)]
-                results = await asyncio.gather(*batch, return_exceptions=True)
-                
-                for r in results:
-                    if not isinstance(r, Exception) and r.status_code == 200:
-                        completed += 1
-                        data = r.json()
-                        inst = data.get("instance", "unknown")
-                        instance_counts[inst] = instance_counts.get(inst, 0) + 1
-                        latencies.append(float(data["latency"].replace('s','')))
+        async def fire_one(client):
+            try:
+                # Connection: close forces the GFE load balancer to route new connections to new instances
+                res = await client.get(target_url, headers={"Connection": "close"}, timeout=30.0)
+                data = res.json()
+                if "instance" in data:
+                    iid = data["instance"]
+                    state["instances"][iid] = state["instances"].get(iid, 0) + 1
+                if "latency" in data:
+                    state["latencies"].append(float(data["latency"].replace('s', '')))
+            except Exception:
+                pass
+            finally:
+                state["completed"] += 1
 
-                # Calculate stats
-                avg_lat = sum(latencies)/len(latencies) if latencies else 0
-                p95_lat = sorted(latencies)[int(len(latencies)*0.95)] if latencies else 0
+        async with httpx.AsyncClient(limits=limits) as client:
+            start_time = time.time()
+            wave = 0
+            firing = True
+            tasks = set()
+
+            while firing or len(tasks) > 0:
+                if await request.is_disconnected():
+                    break
+
+                if firing:
+                    wave += 1
+                    # Fire one wave of requests concurrently without blocking
+                    for _ in range(rps):
+                        t = asyncio.create_task(fire_one(client))
+                        tasks.add(t)
+                        t.add_done_callback(tasks.discard)
+                    state["total_fired"] += rps
+                    
+                    if time.time() - start_time >= duration:
+                        firing = False
+
+                completed = state["completed"]
+                total = state["total_fired"]
+                instances = state["instances"]
+                latencies = state["latencies"]
+                avg = sum(latencies) / len(latencies) if latencies else 0
                 
-                # Prepare payload carefully for Python 3.11 compatibility
+                if latencies:
+                    lat_sorted = sorted(latencies)
+                    p95 = lat_sorted[int(len(lat_sorted) * 0.95)]
+                else:
+                    p95 = 0
+
                 payload = {
                     "completed": completed,
-                    "total_expected": total_requests,
-                    "instance_count": len(instance_counts),
-                    "avg_latency": round(avg_lat, 2),
-                    "p95_latency": round(p95_lat, 2),
-                    "instances": instance_counts
+                    "total_expected": duration * rps,
+                    "instance_count": len(instances),
+                    "avg_latency": round(avg, 2),
+                    "p95_latency": round(p95, 2),
+                    "instances": instances
                 }
+                
                 yield f"data: {json.dumps(payload)}\n\n"
-                await asyncio.sleep(1)
+
+                # Accurate 1-second ticks
+                if firing:
+                    elapsed = time.time() - start_time
+                    wait = wave - elapsed
+                    if wait > 0:
+                        await asyncio.sleep(min(wait, 1.0))
+                else:
+                    await asyncio.sleep(1.0)
         
-        yield "data: {\"type\": \"done\"}\n\n"
+        if not await request.is_disconnected():
+            yield "data: {\"type\": \"done\"}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
-
-@app.get("/instances")
-async def get_instance_count():
-    """Queries Cloud Monitoring for official active container count."""
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "prepr-ai-service-assessment")
-    client = monitoring_v3.MetricServiceClient()
-    project_name = f"projects/{project_id}"
-
-    filter_str = (
-        'resource.type = "cloud_run_revision" AND '
-        'resource.labels.service_name = "prepr-ai-service" AND '
-        'metric.type = "run.googleapis.com/container/instance_count"'
-    )
-
-    interval = monitoring_v3.TimeInterval()
-    now = time.time()
-    interval.end_time = {"seconds": int(now), "nanos": int((now % 1) * 1e9)}
-    interval.start_time = {"seconds": int(now - 120), "nanos": int((now % 1) * 1e9)}
-
-    try:
-        results = client.list_time_series(
-            request={
-                "name": project_name,
-                "filter": filter_str,
-                "interval": interval,
-                "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
-            }
-        )
-        count = sum(p.value.int64_value for s in results for p in (s.points[:1] if s.points else []))
-        return {"instance_count": max(1, count)}
-    except Exception:
-        return {"instance_count": 1}
 
 STATIC_DIR = Path(__file__).parent / "static"
 
