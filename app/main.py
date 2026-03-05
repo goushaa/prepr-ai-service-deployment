@@ -56,20 +56,11 @@ async def health():
     return {"status": "healthy", "instance_id": INSTANCE_ID}
 
 
-from starlette.concurrency import run_in_threadpool
-
-def _cpu_bound_task(duration: float):
-    """Simulates real ML ML CPU load without sleeping."""
-    start = time.time()
-    while time.time() - start < duration:
-        pass
-
 @app.get("/generate")
 async def generate():
-    """Simulates an AI response with 2-4s latency (ML CPU load)."""
+    """Simulates an AI response with 2-4s latency."""
     latency = random.uniform(2.0, 4.0)
-    # Run CPU intensive task in a background thread to avoid blocking FastAPI
-    await run_in_threadpool(_cpu_bound_task, latency)
+    await asyncio.sleep(latency)
 
     return JSONResponse(
         content={
@@ -102,7 +93,8 @@ async def burst(duration: int = 30, rps: int = 20, request: Request = None):
     import httpx
 
     async def event_stream():
-        limits = httpx.Limits(max_connections=rps * 5, max_keepalive_connections=rps * 5)
+        # Disable keep-alive to force Cloud Run to load-balance every request across instances
+        limits = httpx.Limits(max_connections=rps * 5, max_keepalive_connections=0)
         
         state = {
             "completed": 0,
@@ -114,7 +106,8 @@ async def burst(duration: int = 30, rps: int = 20, request: Request = None):
 
         async def fire_one(client):
             try:
-                res = await client.get(target, timeout=30.0)
+                # Connection: close forces the GFE load balancer to route new connections to new instances
+                res = await client.get(target, headers={"Connection": "close"}, timeout=30.0)
                 data = res.json()
                 if "instance_id" in data:
                     iid = data["instance_id"]

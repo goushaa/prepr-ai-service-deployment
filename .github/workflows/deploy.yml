@@ -53,7 +53,7 @@ jobs:
             --allow-unauthenticated \
             --min-instances 1 \
             --max-instances 10 \
-            --concurrency 80 \
+            --concurrency 15 \
             --port 8080 \
             --quiet
 
