@@ -55,11 +55,20 @@ async def health():
     return {"status": "healthy", "instance_id": INSTANCE_ID}
 
 
+from starlette.concurrency import run_in_threadpool
+
+def _cpu_bound_task(duration: float):
+    """Simulates real ML ML CPU load without sleeping."""
+    start = time.time()
+    while time.time() - start < duration:
+        pass
+
 @app.get("/generate")
-def generate():
-    """Simulates an AI response with 2-4s latency (blocking, like real ML inference)."""
+async def generate():
+    """Simulates an AI response with 2-4s latency (ML CPU load)."""
     latency = random.uniform(2.0, 4.0)
-    time.sleep(latency)  # Blocking sleep — simulates real CPU-bound ML processing
+    # Run CPU intensive task in a background thread to avoid blocking FastAPI
+    await run_in_threadpool(_cpu_bound_task, latency)
 
     return JSONResponse(
         content={
