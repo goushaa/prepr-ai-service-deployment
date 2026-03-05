@@ -15,9 +15,9 @@ from fastapi.staticfiles import StaticFiles
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-# Unique ID for this instance — generated once at startup.
-# If Cloud Run scales to 3 instances, there will be 3 different INSTANCE_IDs.
-INSTANCE_ID = os.environ.get("K_REVISION", str(uuid.uuid4())[:8])
+# Unique ID for this container instance — generated once at startup.
+# Cloud Run scales horizontally, so each container gets a unique UUID.
+INSTANCE_ID = str(uuid.uuid4())[:8]
 
 app = FastAPI(
     title="Prepr AI Service",
