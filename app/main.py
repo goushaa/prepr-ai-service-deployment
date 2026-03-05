@@ -56,10 +56,10 @@ async def health():
 
 
 @app.get("/generate")
-async def generate():
-    """Simulates an AI response with 2-4s latency (like calling an ML model)."""
+def generate():
+    """Simulates an AI response with 2-4s latency (blocking, like real ML inference)."""
     latency = random.uniform(2.0, 4.0)
-    await asyncio.sleep(latency)
+    time.sleep(latency)  # Blocking sleep — simulates real CPU-bound ML processing
 
     return JSONResponse(
         content={
