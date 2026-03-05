@@ -93,7 +93,11 @@ async def burst(count: int = 50, request: Request = None):
         except Exception as e:
             return {"error": str(e)}
 
-    async with __import__("httpx").AsyncClient() as client:
+    # Open enough connections to actually hit concurrency limits and trigger scaling.
+    # Default httpx pool = 10 per host, which would never exceed Cloud Run's concurrency.
+    import httpx
+    limits = httpx.Limits(max_connections=count, max_keepalive_connections=count)
+    async with httpx.AsyncClient(limits=limits) as client:
         tasks = [fire_one(client) for _ in range(count)]
         results = await asyncio.gather(*tasks)
 
