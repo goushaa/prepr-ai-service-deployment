@@ -447,6 +447,18 @@
                 <span class="spinner"></span> Try /health
             </button>
             <div class="result" id="health-result"></div>
+
+            <hr class="divider">
+
+            <div class="endpoint-row">
+                <span class="method-badge">GET</span>
+                <span class="endpoint-path">/generate</span>
+            </div>
+            <p class="endpoint-desc">Simulates an AI response with 2-4s latency.</p>
+            <button class="try-btn" onclick="tryEndpoint('/generate', 'generate-result')">
+                <span class="spinner"></span> Try /generate
+            </button>
+            <div class="result" id="generate-result"></div>
         </div>
 
         <div class="card">

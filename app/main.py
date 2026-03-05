@@ -48,9 +48,9 @@ async def health():
     """Liveness probe used by Cloud Run."""
     return {"status": "healthy", "instance": INSTANCE_ID}
 
-@app.get("/generate", include_in_schema=False)
+@app.get("/generate")
 async def generate():
-    """Simulates an AI generation task with 2-4s latency. Hidden from Swagger docs."""
+    """Simulates an AI generation task with 2-4s latency."""
     delay = 2 + (time.time() % 2)
     await asyncio.sleep(delay)
     return {
