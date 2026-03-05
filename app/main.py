@@ -3,9 +3,11 @@ import logging
 import random
 import time
 import uuid
+from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 # Structured logging — Cloud Logging picks this up automatically
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -59,3 +61,18 @@ async def generate():
             "latency_seconds": round(latency, 2),
         }
     )
+
+
+# --- Landing page ---
+
+STATIC_DIR = Path(__file__).parent / "static"
+
+
+@app.get("/")
+async def landing():
+    """Serves the interactive demo page for reviewers."""
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+# Mount static files (CSS, JS, etc. if needed in the future)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

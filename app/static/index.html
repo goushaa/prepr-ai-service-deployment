@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prepr AI Service — Live Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 720px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #1a3a2a;
+            color: #4ade80;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .subtitle a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+
+        .card {
+            background: #141414;
+            border: 1px solid #252525;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .endpoint-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .method-badge {
+            background: #1a2a1a;
+            color: #4ade80;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: monospace;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .endpoint-path {
+            font-family: monospace;
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        .endpoint-desc {
+            font-size: 13px;
+            color: #666;
+            margin-left: 62px;
+            margin-bottom: 16px;
+        }
+
+        .try-btn {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            color: #e0e0e0;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .try-btn:hover {
+            background: #2a2a2a;
+            border-color: #4ade80;
+            color: #fff;
+        }
+
+        .try-btn:disabled {
+            opacity: 0.5;
+            cursor: wait;
+        }
+
+        .try-btn .spinner {
+            display: none;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #333;
+            border-top: 2px solid #4ade80;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .try-btn.loading .spinner {
+            display: block;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .result {
+            margin-top: 12px;
+            background: #0d0d0d;
+            border: 1px solid #1e1e1e;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            display: none;
+        }
+
+        .result.visible {
+            display: block;
+        }
+
+        .result .label {
+            color: #666;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .result .json-key {
+            color: #60a5fa;
+        }
+
+        .result .json-val {
+            color: #4ade80;
+        }
+
+        .result .json-num {
+            color: #f59e0b;
+        }
+
+        .result .meta {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #1e1e1e;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .info-item {
+            background: #0d0d0d;
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        .info-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #e0e0e0;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 32px;
+            color: #444;
+            font-size: 13px;
+        }
+
+        .footer a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+
+        .links {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+
+        .link-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            color: #ccc;
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .link-btn:hover {
+            border-color: #60a5fa;
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="badge">● LIVE ON CLOUD RUN</div>
+            <h1>Prepr AI Service</h1>
+            <p class="subtitle">
+                Minimal AI service deployed with Terraform, CI/CD, and Cloud Monitoring.
+                Built by <strong>Kady</strong> for the Prepr Labs DevOps assessment.
+                <br>
+                <a href="https://github.com/goushaa/prepr-ai-service-deployment" target="_blank">View on GitHub →</a>
+            </p>
+        </div>
+
+        <!-- Try the Endpoints -->
+        <div class="card">
+            <div class="card-title">Try the Endpoints</div>
+
+            <div class="endpoint-row">
+                <span class="method-badge">GET</span>
+                <span class="endpoint-path">/health</span>
+            </div>
+            <p class="endpoint-desc">Health check — used by Cloud Run to verify the container is alive.</p>
+            <button class="try-btn" onclick="tryEndpoint('/health', 'health-result')">
+                <span class="spinner"></span>
+                Try /health
+            </button>
+            <div class="result" id="health-result"></div>
+
+            <hr style="border: none; border-top: 1px solid #1e1e1e; margin: 20px 0;">
+
+            <div class="endpoint-row">
+                <span class="method-badge">GET</span>
+                <span class="endpoint-path">/generate</span>
+            </div>
+            <p class="endpoint-desc">Simulates an AI response with 1–5s latency (like calling an ML model).</p>
+            <button class="try-btn" onclick="tryEndpoint('/generate', 'generate-result')">
+                <span class="spinner"></span>
+                Try /generate
+            </button>
+            <div class="result" id="generate-result"></div>
+        </div>
+
+        <!-- Architecture Info -->
+        <div class="card">
+            <div class="card-title">Architecture</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Compute</div>
+                    <div class="info-value">GCP Cloud Run</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Scaling</div>
+                    <div class="info-value">0–8 instances</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Concurrency</div>
+                    <div class="info-value">80 req/instance</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">CI/CD</div>
+                    <div class="info-value">GitHub Actions</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">IaC</div>
+                    <div class="info-value">Terraform</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Monitoring</div>
+                    <div class="info-value">Cloud Monitoring</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Links -->
+        <div class="footer">
+            <div class="links">
+                <a class="link-btn" href="https://github.com/goushaa/prepr-ai-service-deployment" target="_blank">
+                    GitHub Repo
+                </a>
+                <a class="link-btn" href="/docs" target="_blank">
+                    API Docs (Swagger)
+                </a>
+            </div>
+            <p style="margin-top: 16px;">Built by Kady • MASc @ York University</p>
+        </div>
+    </div>
+
+    <script>
+        async function tryEndpoint(path, resultId) {
+            const resultEl = document.getElementById(resultId);
+            const btn = resultEl.previousElementSibling;
+
+            btn.classList.add('loading');
+            btn.disabled = true;
+            resultEl.classList.add('visible');
+            resultEl.innerHTML = '<div class="label">Waiting for response...</div>';
+
+            const start = performance.now();
+
+            try {
+                const res = await fetch(path);
+                const data = await res.json();
+                const elapsed = ((performance.now() - start) / 1000).toFixed(2);
+
+                const formatted = Object.entries(data)
+                    .map(([k, v]) => {
+                        const valClass = typeof v === 'number' ? 'json-num' : 'json-val';
+                        const val = typeof v === 'string' ? `"${v}"` : v;
+                        return `  <span class="json-key">"${k}"</span>: <span class="${valClass}">${val}</span>`;
+                    })
+                    .join(',\n');
+
+                resultEl.innerHTML = `
+                    <div class="label">Response (${res.status})</div>
+                    {\n${formatted}\n}
+                    <div class="meta">⏱ Round-trip: ${elapsed}s</div>
+                `;
+            } catch (err) {
+                resultEl.innerHTML = `<div class="label">Error</div>${err.message}`;
+            }
+
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    </script>
+</body>
+
+</html>
