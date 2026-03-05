@@ -6,8 +6,9 @@ import time
 import uuid
 from pathlib import Path
 
+import json
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 # Structured logging — Cloud Logging picks this up automatically
@@ -99,67 +100,97 @@ async def burst(duration: int = 30, rps: int = 20, request: Request = None):
     target = f"{scheme}://{host}/generate"
 
     import httpx
-    limits = httpx.Limits(max_connections=rps * 5, max_keepalive_connections=rps * 5)
 
-    async def fire_one(client):
-        try:
-            res = await client.get(target, timeout=30.0)
-            return res.json()
-        except Exception as e:
-            return {"error": str(e)}
+    async def event_stream():
+        limits = httpx.Limits(max_connections=rps * 5, max_keepalive_connections=rps * 5)
+        
+        state = {
+            "completed": 0,
+            "errors": 0,
+            "instances": {},
+            "latencies": [],
+            "total_fired": 0
+        }
 
-    async with httpx.AsyncClient(limits=limits) as client:
-        start_time = time.time()
-        wave = 0
-        all_tasks = []
+        async def fire_one(client):
+            try:
+                res = await client.get(target, timeout=30.0)
+                data = res.json()
+                if "instance_id" in data:
+                    iid = data["instance_id"]
+                    state["instances"][iid] = state["instances"].get(iid, 0) + 1
+                if "latency_seconds" in data:
+                    state["latencies"].append(data["latency_seconds"])
+            except Exception as e:
+                state["errors"] += 1
+            finally:
+                state["completed"] += 1
 
-        # Fire waves every second WITHOUT waiting for completions.
-        # This builds up in-flight requests: after 3s with 20 rps and 3s avg latency,
-        # there are ~60 simultaneous requests, exceeding concurrency=10.
-        while time.time() - start_time < duration:
-            wave += 1
-            all_tasks.extend([fire_one(client) for _ in range(rps)])
+        async with httpx.AsyncClient(limits=limits) as client:
+            start_time = time.time()
+            wave = 0
+            firing = True
+            tasks = set()
 
-            # Wait 1 second before next wave
-            elapsed = time.time() - start_time
-            wait = wave - elapsed
-            if wait > 0:
-                await asyncio.sleep(wait)
+            # Loop while we are still supposed to fire OR we have pending requests
+            while firing or len(tasks) > 0:
+                if await request.is_disconnected():
+                    # Stop if client disconnects
+                    break
 
-        # Wait for all in-flight requests to finish
-        all_results = await asyncio.gather(*all_tasks)
+                if firing:
+                    wave += 1
+                    # Fire one wave of requests
+                    for _ in range(rps):
+                        t = asyncio.create_task(fire_one(client))
+                        tasks.add(t)
+                        t.add_done_callback(tasks.discard)
+                    state["total_fired"] += rps
+                    
+                    if time.time() - start_time >= duration:
+                        firing = False
 
-    # Aggregate results
-    instances = {}
-    latencies = []
-    errors = 0
+                # Calc stats to stream
+                completed = state["completed"]
+                total = state["total_fired"]
+                instances = state["instances"]
+                latencies = state["latencies"]
+                avg = sum(latencies) / len(latencies) if latencies else 0
+                
+                # Fast p95 calc
+                if latencies:
+                    lat_sorted = sorted(latencies)
+                    p95 = lat_sorted[int(len(lat_sorted) * 0.95)]
+                else:
+                    p95 = 0
 
-    for r in all_results:
-        if "error" in r:
-            errors += 1
-        else:
-            if "instance_id" in r:
-                iid = r["instance_id"]
-                instances[iid] = instances.get(iid, 0) + 1
-            if "latency_seconds" in r:
-                latencies.append(r["latency_seconds"])
+                update_data = {
+                    "type": "update",
+                    "completed": completed,
+                    "total_expected": duration * rps,
+                    "errors": state["errors"],
+                    "instances": instances,
+                    "instance_count": len(instances),
+                    "avg_latency": round(avg, 2),
+                    "p95_latency": round(p95, 2)
+                }
+                
+                yield f"data: {json.dumps(update_data)}\n\n"
 
-    latencies.sort()
-    total = len(all_results)
-    avg = sum(latencies) / len(latencies) if latencies else 0
-    p95 = latencies[int(len(latencies) * 0.95)] if latencies else 0
+                # Wait for next tick (~1 second)
+                if firing:
+                    elapsed = time.time() - start_time
+                    wait = wave - elapsed
+                    if wait > 0:
+                        await asyncio.sleep(min(wait, 1.0))
+                else:
+                    await asyncio.sleep(1.0)
 
-    return {
-        "total": total,
-        "successful": total - errors,
-        "errors": errors,
-        "duration_seconds": duration,
-        "waves": wave,
-        "instance_count": len(instances),
-        "instances": instances,
-        "avg_latency": round(avg, 2),
-        "p95_latency": round(p95, 2),
-    }
+            # Final success message
+            if not await request.is_disconnected():
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 # --- Landing page ---

@@ -584,8 +584,8 @@
             const panel = document.getElementById('burst-results');
             panel.style.display = 'block';
 
-            // Progress animation during load test
-            document.getElementById('burst-progress').style.width = '10%';
+            // Reset UI
+            document.getElementById('burst-progress').style.width = '0%';
             document.getElementById('stat-completed').textContent = '...';
             document.getElementById('stat-instances').textContent = '...';
             document.getElementById('stat-avg').textContent = '...';
@@ -593,50 +593,58 @@
             document.getElementById('instance-list').innerHTML =
                 '<div class="stat-label" style="margin-bottom: 8px;">Running sustained load for ' + duration + 's (20 req/s)...</div>';
 
-            // Animate progress bar during wait
-            const progressEl = document.getElementById('burst-progress');
-            const startTime = Date.now();
-            const progressInterval = setInterval(() => {
-                const elapsed = (Date.now() - startTime) / 1000;
-                const pct = Math.min(90, (elapsed / (duration + 5)) * 90);
-                progressEl.style.width = pct + '%';
-            }, 500);
-
             try {
-                const res = await fetch(`/burst?duration=${duration}&rps=20`);
-                const data = await res.json();
-                clearInterval(progressInterval);
+                const eventSource = new EventSource(`/burst?duration=${duration}&rps=20`);
 
-                // Update stats
-                document.getElementById('burst-progress').style.width = '100%';
-                document.getElementById('stat-completed').textContent = `${data.successful}/${data.total}`;
-                document.getElementById('stat-instances').textContent = data.instance_count;
-                document.getElementById('stat-avg').textContent = `${data.avg_latency}s`;
-                document.getElementById('stat-p95').textContent = `${data.p95_latency}s`;
+                eventSource.onmessage = function (event) {
+                    const data = JSON.parse(event.data);
 
-                // Update instance list
-                const list = document.getElementById('instance-list');
-                const entries = Object.entries(data.instances).sort((a, b) => b[1] - a[1]);
-                const maxCount = Math.max(...entries.map(e => e[1]), 1);
+                    if (data.type === 'done') {
+                        eventSource.close();
+                        document.getElementById('burst-progress').style.width = '100%';
+                        document.querySelectorAll('.burst-btn').forEach(b => b.disabled = false);
+                        burstRunning = false;
+                        return;
+                    }
 
-                list.innerHTML = '<div class="stat-label" style="margin-bottom: 8px;">Requests per Instance</div>' +
-                    entries.map(([id, cnt]) => `
-                        <div class="instance-row">
-                            <span class="instance-id">${id}</span>
-                            <span style="display: flex; align-items: center; gap: 8px; flex: 1; margin-left: 16px;">
-                                <div class="instance-bar" style="width: ${(cnt / maxCount) * 100}%; min-width: 4px;"></div>
-                                <span class="instance-count">${cnt} req</span>
-                            </span>
-                        </div>
-                    `).join('');
+                    // Live stats update
+                    const pct = Math.min(100, (data.completed / data.total_expected) * 100);
+                    document.getElementById('burst-progress').style.width = pct + '%';
+
+                    document.getElementById('stat-completed').textContent = `${data.completed}/${data.total_expected}`;
+                    document.getElementById('stat-instances').textContent = data.instance_count;
+                    document.getElementById('stat-avg').textContent = `${data.avg_latency}s`;
+                    document.getElementById('stat-p95').textContent = `${data.p95_latency}s`;
+
+                    // Live instance list update
+                    const list = document.getElementById('instance-list');
+                    const entries = Object.entries(data.instances).sort((a, b) => b[1] - a[1]);
+                    const maxCount = Math.max(...entries.map(e => e[1]), 1);
+
+                    list.innerHTML = '<div class="stat-label" style="margin-bottom: 8px;">Requests per Instance</div>' +
+                        entries.map(([id, cnt]) => `
+                            <div class="instance-row">
+                                <span class="instance-id">${id}</span>
+                                <span style="display: flex; align-items: center; gap: 8px; flex: 1; margin-left: 16px;">
+                                    <div class="instance-bar" style="width: ${(cnt / maxCount) * 100}%; min-width: 4px;"></div>
+                                    <span class="instance-count">${cnt} req</span>
+                                </span>
+                            </div>
+                        `).join('');
+                };
+
+                eventSource.onerror = function (err) {
+                    eventSource.close();
+                    document.querySelectorAll('.burst-btn').forEach(b => b.disabled = false);
+                    burstRunning = false;
+                };
+
             } catch (err) {
                 document.getElementById('instance-list').innerHTML =
-                    `<div class="label">Error: ${err.message}</div>`;
+                    `<div class="label" style="color: #ef4444;">Error: ${err.message}</div>`;
+                document.querySelectorAll('.burst-btn').forEach(b => b.disabled = false);
+                burstRunning = false;
             }
-
-            // Re-enable buttons
-            document.querySelectorAll('.burst-btn').forEach(b => b.disabled = false);
-            burstRunning = false;
         }
     </script>
 </body>
