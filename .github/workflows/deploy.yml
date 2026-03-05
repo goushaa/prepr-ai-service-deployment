@@ -52,8 +52,8 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --min-instances 1 \
-            --max-instances 4 \
-            --concurrency 20 \
+            --max-instances 10 \
+            --concurrency 80 \
             --port 8080 \
             --quiet
 
