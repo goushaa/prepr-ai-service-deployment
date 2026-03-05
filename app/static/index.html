@@ -457,8 +457,8 @@
         <div class="card">
             <div class="card-title">Burst Traffic Test</div>
             <p style="color: #888; font-size: 13px; margin-bottom: 16px;">
-                Fire concurrent requests to watch Cloud Run auto-scale. Each instance has a unique ID,
-                so you can see how the load is distributed.
+                Requests fire server-side (no browser connection limits) through the Cloud Run
+                load balancer. Watch the instance count grow as Cloud Run auto-scales.
             </p>
 
             <div class="burst-controls">
@@ -573,7 +573,7 @@
             btn.disabled = false;
         }
 
-        // --- Burst traffic test ---
+        // --- Burst traffic test (server-side) ---
         let burstRunning = false;
 
         async function runBurst(count) {
@@ -583,66 +583,49 @@
             // Disable all burst buttons
             document.querySelectorAll('.burst-btn').forEach(b => b.disabled = true);
 
-            // Show results panel
+            // Show results panel with loading state
             const panel = document.getElementById('burst-results');
             panel.style.display = 'block';
 
-            // Reset stats
-            let completed = 0;
-            let latencies = [];
-            let instances = {};
+            // Show loading state
+            document.getElementById('burst-progress').style.width = '30%';
+            document.getElementById('stat-completed').textContent = '...';
+            document.getElementById('stat-instances').textContent = '...';
+            document.getElementById('stat-avg').textContent = '...';
+            document.getElementById('stat-p95').textContent = '...';
+            document.getElementById('instance-list').innerHTML =
+                '<div class="stat-label" style="margin-bottom: 8px;">Firing ' + count + ' concurrent requests server-side...</div>';
 
-            const update = () => {
-                document.getElementById('stat-completed').textContent = `${completed}/${count}`;
-                document.getElementById('stat-instances').textContent = Object.keys(instances).length;
-                document.getElementById('burst-progress').style.width = `${(completed / count) * 100}%`;
+            try {
+                const res = await fetch(`/burst?count=${count}`);
+                const data = await res.json();
 
-                if (latencies.length > 0) {
-                    const avg = latencies.reduce((a, b) => a + b, 0) / latencies.length;
-                    document.getElementById('stat-avg').textContent = `${avg.toFixed(2)}s`;
-
-                    const sorted = [...latencies].sort((a, b) => a - b);
-                    const p95idx = Math.floor(sorted.length * 0.95);
-                    document.getElementById('stat-p95').textContent = `${sorted[p95idx].toFixed(2)}s`;
-                }
+                // Update stats
+                document.getElementById('burst-progress').style.width = '100%';
+                document.getElementById('stat-completed').textContent = `${data.successful}/${data.total}`;
+                document.getElementById('stat-instances').textContent = data.instance_count;
+                document.getElementById('stat-avg').textContent = `${data.avg_latency}s`;
+                document.getElementById('stat-p95').textContent = `${data.p95_latency}s`;
 
                 // Update instance list
                 const list = document.getElementById('instance-list');
-                const maxCount = Math.max(...Object.values(instances), 1);
+                const entries = Object.entries(data.instances).sort((a, b) => b[1] - a[1]);
+                const maxCount = Math.max(...entries.map(e => e[1]), 1);
+
                 list.innerHTML = '<div class="stat-label" style="margin-bottom: 8px;">Requests per Instance</div>' +
-                    Object.entries(instances)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([id, cnt]) => `
-                            <div class="instance-row">
-                                <span class="instance-id">${id}</span>
-                                <span style="display: flex; align-items: center; gap: 8px; flex: 1; margin-left: 16px;">
-                                    <div class="instance-bar" style="width: ${(cnt / maxCount) * 100}%; min-width: 4px;"></div>
-                                    <span class="instance-count">${cnt} req</span>
-                                </span>
-                            </div>
-                        `).join('');
-            };
-
-            // Fire all requests concurrently
-            const promises = Array.from({ length: count }, async () => {
-                try {
-                    const res = await fetch('/generate');
-                    const data = await res.json();
-
-                    // Use server-side latency (not browser round-trip which includes connection queuing)
-                    if (data.latency_seconds) latencies.push(data.latency_seconds);
-                    if (data.instance_id) {
-                        instances[data.instance_id] = (instances[data.instance_id] || 0) + 1;
-                    }
-                } catch (e) {
-                    // count failures too
-                }
-                completed++;
-                update();
-            });
-
-            update();
-            await Promise.all(promises);
+                    entries.map(([id, cnt]) => `
+                        <div class="instance-row">
+                            <span class="instance-id">${id}</span>
+                            <span style="display: flex; align-items: center; gap: 8px; flex: 1; margin-left: 16px;">
+                                <div class="instance-bar" style="width: ${(cnt / maxCount) * 100}%; min-width: 4px;"></div>
+                                <span class="instance-count">${cnt} req</span>
+                            </span>
+                        </div>
+                    `).join('');
+            } catch (err) {
+                document.getElementById('instance-list').innerHTML =
+                    `<div class="label">Error: ${err.message}</div>`;
+            }
 
             // Re-enable buttons
             document.querySelectorAll('.burst-btn').forEach(b => b.disabled = false);

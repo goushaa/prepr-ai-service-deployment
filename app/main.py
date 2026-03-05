@@ -71,6 +71,60 @@ async def generate():
     )
 
 
+# --- Burst test (server-side load testing) ---
+
+@app.get("/burst")
+async def burst(count: int = 50, request: Request = None):
+    """Fires N concurrent requests through the load balancer to trigger auto-scaling."""
+    count = min(count, 200)  # Safety cap
+
+    # Build the URL for /generate using the incoming request's host
+    base_url = str(request.base_url).rstrip("/")
+    target = f"{base_url}/generate"
+
+    results = []
+
+    async def fire_one(client):
+        try:
+            res = await client.get(target, timeout=30.0)
+            return res.json()
+        except Exception as e:
+            return {"error": str(e)}
+
+    async with __import__("httpx").AsyncClient() as client:
+        tasks = [fire_one(client) for _ in range(count)]
+        results = await asyncio.gather(*tasks)
+
+    # Aggregate results
+    instances = {}
+    latencies = []
+    errors = 0
+
+    for r in results:
+        if "error" in r:
+            errors += 1
+        else:
+            if "instance_id" in r:
+                iid = r["instance_id"]
+                instances[iid] = instances.get(iid, 0) + 1
+            if "latency_seconds" in r:
+                latencies.append(r["latency_seconds"])
+
+    latencies.sort()
+    avg = sum(latencies) / len(latencies) if latencies else 0
+    p95 = latencies[int(len(latencies) * 0.95)] if latencies else 0
+
+    return {
+        "total": count,
+        "successful": count - errors,
+        "errors": errors,
+        "instance_count": len(instances),
+        "instances": instances,
+        "avg_latency": round(avg, 2),
+        "p95_latency": round(p95, 2),
+    }
+
+
 # --- Landing page ---
 
 STATIC_DIR = Path(__file__).parent / "static"
