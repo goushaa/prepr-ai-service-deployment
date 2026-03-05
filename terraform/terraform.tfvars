@@ -3,6 +3,6 @@ region     = "us-central1"
 image      = "us-central1-docker.pkg.dev/prepr-ai-service-assessment/prepr-ai-service/api:latest"
 
 # Demo settings (override for production)
-min_instances   = 0
+min_instances   = 1
 max_instances   = 4
 max_concurrency = 1   # Forces 1 request per instance — guarantees visible auto-scaling
