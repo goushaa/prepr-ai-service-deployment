@@ -103,19 +103,23 @@ async def burst(duration: int = 30, rps: int = 20, request: Request = None):
     async with httpx.AsyncClient(limits=limits) as client:
         start_time = time.time()
         wave = 0
+        all_tasks = []
 
-        # Fire waves of requests every second for the specified duration
+        # Fire waves every second WITHOUT waiting for completions.
+        # This builds up in-flight requests: after 3s with 20 rps and 3s avg latency,
+        # there are ~60 simultaneous requests, exceeding concurrency=10.
         while time.time() - start_time < duration:
             wave += 1
-            tasks = [fire_one(client) for _ in range(rps)]
-            results = await asyncio.gather(*tasks)
-            all_results.extend(results)
-            
-            # Wait 1 second before next wave (minus time already spent)
+            all_tasks.extend([fire_one(client) for _ in range(rps)])
+
+            # Wait 1 second before next wave
             elapsed = time.time() - start_time
             wait = wave - elapsed
             if wait > 0:
                 await asyncio.sleep(wait)
+
+        # Wait for all in-flight requests to finish
+        all_results = await asyncio.gather(*all_tasks)
 
     # Aggregate results
     instances = {}
