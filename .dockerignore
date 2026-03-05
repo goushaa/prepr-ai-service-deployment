@@ -1,8 +1,10 @@
 .git
 .github
 terraform
+*.tfstate
+*.tfstate.backup
+.terraform
+logs.txt
+venv
 __pycache__
 *.pyc
-*.md
-.dockerignore
-Dockerfile

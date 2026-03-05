@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prepr AI Service | Live Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 720px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #1a3a2a;
+            color: #4ade80;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .subtitle a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+
+        .card {
+            background: #141414;
+            border: 1px solid #252525;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .endpoint-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .method-badge {
+            background: #1a2a1a;
+            color: #4ade80;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: monospace;
+        }
+
+        .endpoint-path {
+            font-family: monospace;
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        .endpoint-desc {
+            font-size: 13px;
+            color: #666;
+            margin-left: 62px;
+            margin-bottom: 16px;
+        }
+
+        .try-btn {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            color: #e0e0e0;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .try-btn:hover {
+            background: #2a2a2a;
+            border-color: #4ade80;
+            color: #fff;
+        }
+
+        .try-btn:disabled {
+            opacity: 0.5;
+            cursor: wait;
+        }
+
+        .try-btn .spinner {
+            display: none;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #333;
+            border-top: 2px solid #4ade80;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .try-btn.loading .spinner {
+            display: block;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .result {
+            margin-top: 12px;
+            background: #0d0d0d;
+            border: 1px solid #1e1e1e;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            display: none;
+        }
+
+        .result.visible {
+            display: block;
+        }
+
+        .result .label {
+            color: #666;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .result .json-key {
+            color: #60a5fa;
+        }
+
+        .result .json-val {
+            color: #4ade80;
+        }
+
+        .result .json-num {
+            color: #f59e0b;
+        }
+
+        .result .meta {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #1e1e1e;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .burst-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .burst-btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .burst-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            filter: brightness(1.2);
+        }
+
+        .btn-green {
+            background: #059669;
+        }
+
+        .btn-orange {
+            background: #d97706;
+        }
+
+        .btn-red {
+            background: #dc2626;
+        }
+
+        .burst-btn:disabled {
+            background: #404040;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .burst-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .stat-box {
+            background: #0d0d0d;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
+            margin-top: 4px;
+        }
+
+        .stat-value.green {
+            color: #4ade80;
+        }
+
+        .stat-value.blue {
+            color: #60a5fa;
+        }
+
+        .stat-value.yellow {
+            color: #f59e0b;
+        }
+
+        .stat-value.purple {
+            color: #a78bfa;
+        }
+
+        .instance-list {
+            background: #0d0d0d;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+        }
+
+        .instance-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #1a1a1a;
+            font-size: 13px;
+        }
+
+        .instance-row:last-child {
+            border-bottom: none;
+        }
+
+        .instance-id {
+            font-family: monospace;
+            color: #a78bfa;
+            font-weight: 600;
+        }
+
+        .instance-count {
+            color: #888;
+        }
+
+        .instance-bar {
+            height: 4px;
+            background: #a78bfa;
+            border-radius: 2px;
+            margin-left: 12px;
+            transition: width 0.3s;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #1e1e1e;
+            border-radius: 2px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80, #60a5fa);
+            border-radius: 2px;
+            transition: width 0.2s;
+            width: 0%;
+        }
+
+        .burst-note {
+            font-size: 12px;
+            color: #555;
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .info-item {
+            background: #0d0d0d;
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        .info-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #e0e0e0;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 32px;
+            color: #444;
+            font-size: 13px;
+        }
+
+        .footer a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+
+        .links {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+
+        .link-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            color: #ccc;
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .link-btn:hover {
+            border-color: #60a5fa;
+            color: #fff;
+        }
+
+        hr.divider {
+            border: none;
+            border-top: 1px solid #1e1e1e;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="badge" id="instance-badge">● 1 INSTANCE LIVE</div>
+            <h1>Prepr AI Service</h1>
+            <p class="subtitle">
+                Minimal AI service deployed with Terraform, CI/CD, and Cloud Monitoring.<br>
+                Built by <strong>Kady</strong> for the Prepr Labs DevOps assessment.
+                <br>
+                <a href="https://github.com/goushaa/prepr-ai-service-deployment" target="_blank">View on GitHub →</a>
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Try the Endpoints</div>
+            <div class="endpoint-row">
+                <span class="method-badge">GET</span>
+                <span class="endpoint-path">/health</span>
+            </div>
+            <p class="endpoint-desc">Health check for Cloud Run liveness probes.</p>
+            <button class="try-btn" onclick="tryEndpoint('/health', 'health-result')">
+                <span class="spinner"></span> Try /health
+            </button>
+            <div class="result" id="health-result"></div>
+
+            <hr class="divider">
+
+            <div class="endpoint-row">
+                <span class="method-badge">GET</span>
+                <span class="endpoint-path">/generate</span>
+            </div>
+            <p class="endpoint-desc">Simulates an AI response with 2-4s latency.</p>
+            <button class="try-btn" onclick="tryEndpoint('/generate', 'generate-result')">
+                <span class="spinner"></span> Try /generate
+            </button>
+            <div class="result" id="generate-result"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Auto-Scaling Demo</div>
+            <p style="color: #888; font-size: 13px; margin-bottom: 16px;">
+                Fires 20 requests/second through the load balancer.
+                Sustained load triggers Cloud Run to spin up new instances.
+            </p>
+
+            <div class="burst-controls">
+                <button class="burst-btn btn-green" onclick="runBurst(10)">10s (Standard)</button>
+                <button class="burst-btn btn-orange" onclick="runBurst(30)">30s (Sustained)</button>
+                <button class="burst-btn btn-red" onclick="runBurst(60)">60s (Stress Test)</button>
+            </div>
+
+            <div id="burst-results" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="burst-progress"></div>
+                </div>
+                <div class="burst-stats">
+                    <div class="stat-box">
+                        <div class="stat-label">Completed</div>
+                        <div class="stat-value green" id="stat-completed">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Instances</div>
+                        <div class="stat-value purple" id="stat-instances">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Avg Latency</div>
+                        <div class="stat-value blue" id="stat-avg">-</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">p95 Latency</div>
+                        <div class="stat-value yellow" id="stat-p95">-</div>
+                    </div>
+                </div>
+                <div class="instance-list" id="instance-list">
+                    <div class="stat-label" style="margin-bottom: 8px;">Requests per Instance</div>
+                </div>
+                <p class="burst-note">
+                    Each unique ID represents a separate Cloud Run container.<br>
+                    Multiple IDs confirm auto-scaling is successfully handling the load.
+                </p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Architecture</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Compute</div>
+                    <div class="info-value">GCP Cloud Run</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Scaling</div>
+                    <div class="info-value">0-10 instances</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Concurrency</div>
+                    <div class="info-value">15 req/instance</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">CI/CD</div>
+                    <div class="info-value">GitHub Actions</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">IaC</div>
+                    <div class="info-value">Terraform</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Monitoring</div>
+                    <div class="info-value">Cloud Monitoring</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="links">
+                <a class="link-btn" href="https://github.com/goushaa/prepr-ai-service-deployment" target="_blank">GitHub
+                    Repo</a>
+                <a class="link-btn" href="/docs" target="_blank">API Docs</a>
+            </div>
+            <p style="margin-top: 16px;">Built by Kady</p>
+        </div>
+    </div>
+
+    <script>
+        async function tryEndpoint(path, resultId) {
+            const resultEl = document.getElementById(resultId);
+            const btn = resultEl.previousElementSibling;
+            btn.classList.add('loading');
+            btn.disabled = true;
+            resultEl.classList.add('visible');
+            resultEl.innerHTML = '<div class="label">Waiting for response...</div>';
+
+            const start = performance.now();
+            try {
+                const res = await fetch(path);
+                const data = await res.json();
+                const elapsed = ((performance.now() - start) / 1000).toFixed(2);
+                const formatted = Object.entries(data)
+                    .map(([k, v]) => {
+                        const cls = typeof v === 'number' ? 'json-num' : 'json-val';
+                        const val = typeof v === 'string' ? `"${v}"` : v;
+                        return `  <span class="json-key">"${k}"</span>: <span class="${cls}">${val}</span>`;
+                    }).join(',\n');
+                resultEl.innerHTML = `<div class="label">Response (${res.status})</div>{\n${formatted}\n}<div class="meta">Round-trip: ${elapsed}s</div>`;
+            } catch (err) {
+                resultEl.innerHTML = `<div class="label">Error</div>${err.message}`;
+            }
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+
+        let burstRunning = false;
+        async function runBurst(duration) {
+            if (burstRunning) return;
+            burstRunning = true;
+
+            document.querySelectorAll('.burst-btn').forEach(b => b.disabled = true);
+            const panel = document.getElementById('burst-results');
+            panel.style.display = 'block';
+
+            document.getElementById('burst-progress').style.width = '0%';
+            document.getElementById('stat-completed').textContent = '...';
+            document.getElementById('stat-instances').textContent = '...';
+            document.getElementById('stat-avg').textContent = '...';
+            document.getElementById('stat-p95').textContent = '...';
+            document.getElementById('instance-list').innerHTML = `<div class="stat-label">Load test in progress (${duration}s)...</div>`;
+
+            try {
+                const eventSource = new EventSource(`/burst?duration=${duration}&rps=20`);
+
+                eventSource.onmessage = function (event) {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'done') {
+                        eventSource.close();
+                        document.getElementById('burst-progress').style.width = '100%';
+                        document.querySelectorAll('.burst-btn').forEach(b => b.disabled = false);
+                        burstRunning = false;
+                        return;
+                    }
+
+                    const pct = Math.min(100, (data.completed / data.total_expected) * 100);
+                    document.getElementById('burst-progress').style.width = pct + '%';
+                    document.getElementById('stat-completed').textContent = `${data.completed}/${data.total_expected}`;
+                    document.getElementById('stat-instances').textContent = data.instance_count;
+                    document.getElementById('stat-avg').textContent = `${data.avg_latency}s`;
+                    document.getElementById('stat-p95').textContent = `${data.p95_latency}s`;
+
+                    Object.keys(data.instances).forEach(id => heartBeat(id));
+
+                    const list = document.getElementById('instance-list');
+                    const entries = Object.entries(data.instances).sort((a, b) => b[1] - a[1]);
+                    const maxCount = Math.max(...entries.map(e => e[1]), 1);
+
+                    list.innerHTML = '<div class="stat-label" style="margin-bottom: 8px;">Requests per Instance</div>' +
+                        entries.map(([id, cnt]) => `
+                            <div class="instance-row">
+                                <span class="instance-id">${id}</span>
+                                <span style="display: flex; align-items: center; gap: 8px; flex: 1; margin-left: 16px;">
+                                    <div class="instance-bar" style="width: ${(cnt / maxCount) * 100}%; min-width: 4px;"></div>
+                                    <span class="instance-count">${cnt} req</span>
+                                </span>
+                            </div>
+                        `).join('');
+                };
+
+                eventSource.onerror = function () {
+                    eventSource.close();
+                    document.querySelectorAll('.burst-btn').forEach(b => b.disabled = false);
+                    burstRunning = false;
+                };
+
+            } catch (err) {
+                document.getElementById('instance-list').innerHTML = `<div class="label" style="color: #ef4444;">Error: ${err.message}</div>`;
+                document.querySelectorAll('.burst-btn').forEach(b => b.disabled = false);
+                burstRunning = false;
+            }
+        }
+
+        // Sub-second Discovery & Gradual Scale-Down
+        const liveInstances = new Map();
+
+        function updateBadgeUI() {
+            const count = liveInstances.size || 1;
+            const badge = document.getElementById('instance-badge');
+            badge.textContent = `● ${count} ${count === 1 ? 'INSTANCE' : 'INSTANCES'} LIVE`;
+            badge.style.background = count > 1 ? '#065f46' : '#1a3a2a';
+            badge.style.color = count > 1 ? '#34d399' : '#4ade80';
+        }
+
+        function heartBeat(id) {
+            if (!id) return;
+            liveInstances.set(id, Date.now());
+            updateBadgeUI();
+        }
+
+        // Staggered Pruning: removes max 1 instance per 2s cycle to simulate organic scale-down
+        setInterval(() => {
+            const now = Date.now();
+            const staleIds = [];
+            for (const [id, lastSeen] of liveInstances.entries()) {
+                if (now - lastSeen > 30000) staleIds.push(id);
+            }
+            if (staleIds.length > 0) {
+                liveInstances.delete(staleIds[0]);
+                updateBadgeUI();
+            }
+        }, 2000);
+
+        async function keepAlive() {
+            try {
+                const res = await fetch('/health');
+                const data = await res.json();
+                if (data.instance) heartBeat(data.instance);
+            } catch (e) { }
+        }
+        setInterval(keepAlive, 15000);
+        keepAlive();
+    </script>
+</body>
+
+</html>

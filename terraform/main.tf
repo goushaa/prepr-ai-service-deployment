@@ -30,10 +30,12 @@ resource "google_cloud_run_v2_service" "api" {
   location = var.region
 
   template {
+    service_account = google_service_account.api_sa.email
+
     # Scaling configuration
     scaling {
-      min_instance_count = var.min_instances  # 2 in prod (eliminates cold starts + redundancy)
-      max_instance_count = var.max_instances  # 8 in prod (buffer for burst traffic)
+      min_instance_count = var.min_instances
+      max_instance_count = var.max_instances
     }
 
     # Container configuration
@@ -81,6 +83,20 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   location = var.region
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+# --- Service Account for the API ---
+
+resource "google_service_account" "api_sa" {
+  account_id   = "prepr-ai-service-sa"
+  display_name = "Service Account for Prepr AI Service"
+}
+
+# Grant Monitoring Viewer to the service account
+resource "google_project_iam_member" "monitoring_viewer" {
+  project = var.project_id
+  role    = "roles/monitoring.viewer"
+  member  = "serviceAccount:${google_service_account.api_sa.email}"
 }
 
 # --- Monitoring: Alert on high p95 latency ---
