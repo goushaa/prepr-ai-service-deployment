@@ -455,16 +455,15 @@
 
         <!-- Burst Traffic Test -->
         <div class="card">
-            <div class="card-title">Burst Traffic Test</div>
+            <div class="card-title">Auto-Scaling Demo</div>
             <p style="color: #888; font-size: 13px; margin-bottom: 16px;">
-                Requests fire server-side (no browser connection limits) through the Cloud Run
-                load balancer. Watch the instance count grow as Cloud Run auto-scales.
+                Fires 20 requests/second for N seconds through the load balancer.
+                Sustained load gives Cloud Run time to detect overload and spin up new instances.
             </p>
 
             <div class="burst-controls">
-                <button class="burst-btn" onclick="runBurst(10)" id="burst-10">10 requests</button>
-                <button class="burst-btn" onclick="runBurst(50)" id="burst-50">50 requests</button>
-                <button class="burst-btn" onclick="runBurst(200)" id="burst-200">200 requests</button>
+                <button class="burst-btn" onclick="runBurst(10)">10 seconds</button>
+                <button class="burst-btn" onclick="runBurst(30)">30 seconds</button>
             </div>
 
             <div id="burst-results" style="display: none;">
@@ -498,7 +497,7 @@
                 <p class="burst-note">
                     Each unique instance ID = a separate Cloud Run container.
                     Multiple IDs means Cloud Run scaled up to handle the load.
-                    Instances stay warm for ~15 min before scaling back down.
+                    Latency stays stable because traffic is distributed across instances.
                 </p>
             </div>
         </div>
@@ -513,11 +512,11 @@
                 </div>
                 <div class="info-item">
                     <div class="info-label">Scaling</div>
-                    <div class="info-value">0-8 instances</div>
+                    <div class="info-value">0-4 instances</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Concurrency</div>
-                    <div class="info-value">80 req/instance</div>
+                    <div class="info-value">10 req/instance</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">CI/CD</div>
@@ -573,32 +572,40 @@
             btn.disabled = false;
         }
 
-        // --- Burst traffic test (server-side) ---
+        // --- Sustained load test (server-side) ---
         let burstRunning = false;
 
-        async function runBurst(count) {
+        async function runBurst(duration) {
             if (burstRunning) return;
             burstRunning = true;
 
-            // Disable all burst buttons
             document.querySelectorAll('.burst-btn').forEach(b => b.disabled = true);
 
-            // Show results panel with loading state
             const panel = document.getElementById('burst-results');
             panel.style.display = 'block';
 
-            // Show loading state
-            document.getElementById('burst-progress').style.width = '30%';
+            // Progress animation during load test
+            document.getElementById('burst-progress').style.width = '10%';
             document.getElementById('stat-completed').textContent = '...';
             document.getElementById('stat-instances').textContent = '...';
             document.getElementById('stat-avg').textContent = '...';
             document.getElementById('stat-p95').textContent = '...';
             document.getElementById('instance-list').innerHTML =
-                '<div class="stat-label" style="margin-bottom: 8px;">Firing ' + count + ' concurrent requests server-side...</div>';
+                '<div class="stat-label" style="margin-bottom: 8px;">Running sustained load for ' + duration + 's (20 req/s)...</div>';
+
+            // Animate progress bar during wait
+            const progressEl = document.getElementById('burst-progress');
+            const startTime = Date.now();
+            const progressInterval = setInterval(() => {
+                const elapsed = (Date.now() - startTime) / 1000;
+                const pct = Math.min(90, (elapsed / (duration + 5)) * 90);
+                progressEl.style.width = pct + '%';
+            }, 500);
 
             try {
-                const res = await fetch(`/burst?count=${count}`);
+                const res = await fetch(`/burst?duration=${duration}&rps=20`);
                 const data = await res.json();
+                clearInterval(progressInterval);
 
                 // Update stats
                 document.getElementById('burst-progress').style.width = '100%';

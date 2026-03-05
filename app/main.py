@@ -71,20 +71,27 @@ def generate():
     )
 
 
-# --- Burst test (server-side load testing) ---
+# --- Load test (sustained server-side load to trigger auto-scaling) ---
 
 @app.get("/burst")
-async def burst(count: int = 50, request: Request = None):
-    """Fires N concurrent requests through the load balancer to trigger auto-scaling."""
-    count = min(count, 200)  # Safety cap
+async def burst(duration: int = 30, rps: int = 20, request: Request = None):
+    """Fires sustained load for N seconds to trigger auto-scaling.
+    
+    Args:
+        duration: How long to sustain load (seconds, max 60)
+        rps: Requests per second to fire (max 50)
+    """
+    duration = min(duration, 60)
+    rps = min(rps, 50)
 
-    # On Cloud Run, TLS terminates at the load balancer so the app sees http://localhost.
-    # Use forwarded headers to reconstruct the public URL that goes through the LB.
+    # Reconstruct the public URL (Cloud Run TLS terminates at load balancer)
     host = request.headers.get("x-forwarded-host", request.headers.get("host", "localhost:8080"))
     scheme = request.headers.get("x-forwarded-proto", "http")
     target = f"{scheme}://{host}/generate"
 
-    results = []
+    import httpx
+    all_results = []
+    limits = httpx.Limits(max_connections=rps * 5, max_keepalive_connections=rps * 5)
 
     async def fire_one(client):
         try:
@@ -93,20 +100,29 @@ async def burst(count: int = 50, request: Request = None):
         except Exception as e:
             return {"error": str(e)}
 
-    # Open enough connections to actually hit concurrency limits and trigger scaling.
-    # Default httpx pool = 10 per host, which would never exceed Cloud Run's concurrency.
-    import httpx
-    limits = httpx.Limits(max_connections=count, max_keepalive_connections=count)
     async with httpx.AsyncClient(limits=limits) as client:
-        tasks = [fire_one(client) for _ in range(count)]
-        results = await asyncio.gather(*tasks)
+        start_time = time.time()
+        wave = 0
+
+        # Fire waves of requests every second for the specified duration
+        while time.time() - start_time < duration:
+            wave += 1
+            tasks = [fire_one(client) for _ in range(rps)]
+            results = await asyncio.gather(*tasks)
+            all_results.extend(results)
+            
+            # Wait 1 second before next wave (minus time already spent)
+            elapsed = time.time() - start_time
+            wait = wave - elapsed
+            if wait > 0:
+                await asyncio.sleep(wait)
 
     # Aggregate results
     instances = {}
     latencies = []
     errors = 0
 
-    for r in results:
+    for r in all_results:
         if "error" in r:
             errors += 1
         else:
@@ -117,13 +133,16 @@ async def burst(count: int = 50, request: Request = None):
                 latencies.append(r["latency_seconds"])
 
     latencies.sort()
+    total = len(all_results)
     avg = sum(latencies) / len(latencies) if latencies else 0
     p95 = latencies[int(len(latencies) * 0.95)] if latencies else 0
 
     return {
-        "total": count,
-        "successful": count - errors,
+        "total": total,
+        "successful": total - errors,
         "errors": errors,
+        "duration_seconds": duration,
+        "waves": wave,
         "instance_count": len(instances),
         "instances": instances,
         "avg_latency": round(avg, 2),

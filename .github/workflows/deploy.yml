@@ -51,8 +51,8 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --max-instances 2 \
-            --concurrency 80 \
+            --max-instances 4 \
+            --concurrency 10 \
             --port 8080 \
             --quiet
 
